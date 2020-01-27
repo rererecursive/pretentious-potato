@@ -14,6 +14,5 @@ echo "Installing packages specified in: $LOCATION"
 
 if [ $TYPE = "pip" ]; then
     pip3 install -r $LOCATION
+    cp -r /home/myuser/.local/lib/python3.8/site-packages/ /host
 fi
-
-cp -r /home/myuser/.local/lib/python3.8/site-packages/ /host
