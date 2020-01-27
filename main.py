@@ -3,7 +3,8 @@ import json
 import re
 import requests
 import sys
-from tqdm import tqdm
+import toml
+import tqdm
 
 
 """
@@ -13,41 +14,6 @@ from tqdm import tqdm
     3a. Print the packages that are latest in one block.
     3b. Print the packages with newer versions in another block.
 """
-
-def get_package_names(filename, packages_to_ignore):
-    packages = []
-
-    with open(filename) as fh:
-        contents = sorted(fh.readlines())
-        contents = list(filter(lambda l: not l.strip().startswith('#'), contents))
-
-    if packages_to_ignore:
-        packages_to_ignore = sorted(packages_to_ignore.split('|'))
-        print("Ignoring packages:", packages_to_ignore)
-        contents = list(filter(lambda l: l not in packages_to_ignore, contents))
-
-    for i, line in enumerate(contents):
-        package = re.split('<=|>=|==', line.strip())
-        packages.append({'name': package[0], 'current': package[1]})
-
-    return packages
-
-
-def pull_package_versions(package_name):
-    url = "https://pypi.python.org/pypi/%s/json" % package_name
-    response = requests.get(url)
-    contents = json.loads(response.content)
-    versions = sorted(list(contents['releases'].keys()), reverse=True)
-
-    return versions[0]
-
-def pull_rust_versions(package_name):
-    url = "https://crates.io/api/v1/crates/%s" % package_name
-    response = requests.get(url)
-    contents = json.loads(response.content)
-    version = contents['crate']['newest_version']
-
-    return version
 
 def pull_nodejs_versions(package_name):
     url = "https://api.npms.io/v2/package/%s" % package_name
@@ -98,6 +64,8 @@ def get_handler(user_args):
         return PipHandler(filename=file, packages_to_ignore=to_ignore, url='https://pypi.python.org/pypi/[PKG]/json')
     if package_type == 'gem':
         return GemHandler(filename=file, packages_to_ignore=to_ignore, url='https://rubygems.org/api/v1/gems/[PKG].json')
+    if package_type == 'crate':
+        return CrateHandler(filename=file, packages_to_ignore=to_ignore, url='https://crates.io/api/v1/crates/[PKG]')
 
 # TODO:
 #   - package reader
@@ -110,7 +78,7 @@ def main():
     packages = handler.read_packages_from_file()
 
     print("Fetching version information for %d packages..." % len(packages))
-    for package in tqdm(packages):
+    for package in tqdm.tqdm(packages):
         latest = handler.pull_latest_version(package['name'])
         package['latest'] = latest
 
@@ -195,5 +163,47 @@ class GemHandler(PackageHandler):
     def pull_latest_version(self, package_name):
         info = self.pull_package_info(package_name)
         return info['version']
+
+class CrateHandler(PackageHandler):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def read_packages_from_file(self):
+        packages = []
+
+        with open(self.filename) as fh:
+            self.contents = toml.load(fh)
+            contents = self.contents['dependencies']
+
+        if self.packages_to_ignore:
+            packages_to_ignore = sorted(self.packages_to_ignore.split('|'))
+            print("Ignoring packages:", packages_to_ignore)
+
+            for p in packages_to_ignore:
+                contents.pop(p)
+
+        for key, value in contents.items():
+            if type(value) == str:
+                packages.append({'name': key, 'current': value.replace('^', '')})
+            elif type(value) == dict:
+                packages.append({'name': key, 'current': value['version'].replace('^', '')})
+
+        return packages
+
+    def pull_latest_version(self, package_name):
+        info = self.pull_package_info(package_name)
+        return info['crate']['newest_version']
+
+    def write_packages_to_file(self, packages):
+        for p in packages:
+            original_val = self.contents['dependencies'][p['name']]
+
+            if type(original_val) == str:
+                self.contents['dependencies'][p['name']] = p['latest']
+            elif type(original_val) == dict:
+                self.contents['dependencies'][p['name']]['version'] = p['latest']
+
+        with open('/tmp/' + self.filename, 'w') as fh:
+            toml.dump(self.contents, fh)
 
 main()
