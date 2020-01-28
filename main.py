@@ -23,15 +23,6 @@ def pull_nodejs_versions(package_name):
 
     return version
 
-def pull_ruby_versions(package_name):
-    url = "https://rubygems.org/api/v1/gems/%s.json" % package_name
-    response = requests.get(url)
-    contents = json.loads(response.content)
-    version = contents['version']
-
-    return version
-
-
 def get_longest_name(packages):
     # For formatting purposes
     names = [p['name'] for p in packages]
@@ -140,7 +131,7 @@ class PipHandler(PackageHandler):
             print("Ignoring packages:", packages_to_ignore)
             contents = list(filter(lambda l: l not in packages_to_ignore, contents))
 
-        for i, line in enumerate(contents):
+        for line in contents:
             package = re.split('<=|>=|==', line.strip())
             packages.append({'name': package[0], 'current': package[1]})
 
@@ -163,6 +154,58 @@ class GemHandler(PackageHandler):
     def pull_latest_version(self, package_name):
         info = self.pull_package_info(package_name)
         return info['version']
+
+    def read_packages_from_file(self):
+        packages = []
+
+        with open(self.filename) as fh:
+            self.contents = fh.readlines()
+            contents = sorted(self.contents)
+            contents = list(filter(lambda l: l.strip().startswith('gem'), contents))
+
+        if self.packages_to_ignore:
+            packages_to_ignore = sorted(self.packages_to_ignore.split('|'))
+            print("Ignoring packages:", packages_to_ignore)
+            contents = list(filter(lambda l: l not in packages_to_ignore, contents))
+
+        for line in contents:
+            package = line.split()
+            if len(package) < 3:
+                version = 'None'   # TODO: this needs to be put into the 'Available' list
+            else:
+                version = package[2]
+
+            pattern = "('|~|>|,)"
+            packages.append({'name': re.sub(pattern, '', package[1]), 'current': re.sub(pattern, '', version)})
+
+        return packages
+
+    def write_packages_to_file(self, packages):
+        contents = self.contents
+
+        for i, line in enumerate(contents):
+            tokens = line.strip().split()
+
+            if not tokens or not tokens[0] == 'gem':
+                continue
+
+            for p in packages:
+                if p['name'] == re.sub("('|~|>|,)", '', tokens[1]):
+                    # Overwrite the version with the latest
+                    try:
+                        tokens[2] = "'%s'\n" % p['latest']
+                    except IndexError:
+                        tokens[1] += ','
+                        tokens.append("'%s'\n" % p['latest'])
+
+                    break
+
+            line = " ".join(tokens)
+            contents[i] = line
+
+        with open('/tmp/' + self.filename, 'w') as fh:
+            fh.write(''.join(contents))
+
 
 class CrateHandler(PackageHandler):
     def __init__(self, *args, **kwargs):

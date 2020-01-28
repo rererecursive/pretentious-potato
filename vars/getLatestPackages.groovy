@@ -4,7 +4,6 @@
         type: 'pip',
         runtime: 'python3.8',
         [installPath]: '/home/jenkins/.local/lib/python3.8/site-packages/',
-        [debug]: true | [false],
         [ignore]: ['awscli', 'numpy']
     )
 */
