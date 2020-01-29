@@ -52,12 +52,13 @@ pipeline {
 It works by querying the APIs for each language's package manager. The URLs can be viewed in `main.py`.
 
 ## Purpose
-This is intended to be added to an existing CI/CD process. There is generally a debate regarding locking versions to specific numbers vs using the 'latest' version.
-This allows us to do both.
-The idea is to lock versions to specific numbers, but to get notified (or automatically update and build) if new versions appear.
+This is intended to be added to an existing CI/CD process. There is generally a debate regarding locking versions to specific numbers vs using the 'latest' version.  
+This allows us to do both.  
+The idea is to lock versions to specific numbers, but to get notified (or automatically update and build) if new versions appear.  
 We then get the best of both worlds: builds are repeatable and won't suddenly break, and packages can also get their latest features and fixes.
 
 ## Options
-Additional options to the Python script:
-`overwrite=true | [false]` - overwrite the original file that contains the package versions
-`ignore=awscli,numpy` - ignore specific packages from being searched for new versions
+Additional options to the Python script:  
+`overwrite=true | [false]` - overwrite the original file that contains the package versions  
+`ignore=awscli,numpy` - ignore specific packages from being searched for new versions  
+
