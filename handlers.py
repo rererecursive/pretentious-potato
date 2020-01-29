@@ -4,10 +4,11 @@ import requests
 import toml
 
 class PackageHandler:
-    def __init__(self, filename, packages_to_ignore, url):
+    def __init__(self, filename, packages_to_ignore, url, overwrite):
         self.filename = filename
-        self.packages_to_ignore = packages_to_ignore
+        self.packages_to_ignore = sorted(packages_to_ignore)
         self.url = url
+        self.overwrite = overwrite
 
     def read_packages_from_file(self):
         pass
@@ -23,6 +24,12 @@ class PackageHandler:
     def write_packages_to_file(self, packages):
         pass
 
+    def get_destination(self):
+        if self.overwrite:
+            return self.filename
+        else:
+            return '/tmp/' + self.filename
+
 
 class PipHandler(PackageHandler):
     def __init__(self, *args, **kwargs):
@@ -36,9 +43,8 @@ class PipHandler(PackageHandler):
             contents = list(filter(lambda l: not l.strip().startswith('#'), contents))
 
         if self.packages_to_ignore:
-            packages_to_ignore = sorted(self.packages_to_ignore.split('|'))
-            print("Ignoring packages:", packages_to_ignore)
-            contents = list(filter(lambda l: l not in packages_to_ignore, contents))
+            print("Ignoring packages:", self.packages_to_ignore)
+            contents = list(filter(lambda l: l not in self.packages_to_ignore, contents))
 
         for line in contents:
             package = re.split('<=|>=|==', line.strip())
@@ -51,7 +57,7 @@ class PipHandler(PackageHandler):
         return sorted(list(info['releases'].keys()), reverse=True)[0]
 
     def write_packages_to_file(self, packages):
-        with open('/tmp/' + self.filename, 'w') as fh:
+        with open(self.get_destination(), 'w') as fh:
             for p in packages:
                 fh.write('%s==%s\n' % (p['name'], p['latest']))
 
@@ -67,10 +73,9 @@ class NpmHandler(PackageHandler):
 
         # ...
         if self.packages_to_ignore:
-            packages_to_ignore = sorted(self.packages_to_ignore.split('|'))
-            print("Ignoring packages:", packages_to_ignore)
+            print("Ignoring packages:", self.packages_to_ignore)
 
-            for p in packages_to_ignore:
+            for p in self.packages_to_ignore:
                 contents.pop(p)
 
         return [{'name': k, 'current': v.replace('^', '')} for k,v in contents.items()]
@@ -85,7 +90,7 @@ class NpmHandler(PackageHandler):
         for p in packages:
             self.contents['dependencies'][p['name']] = p['latest']
 
-        with open('/tmp/' + self.filename, 'w') as fh:
+        with open(self.get_destination(), 'w') as fh:
             json.dump(self.contents, fh, indent=2)
 
 
@@ -106,9 +111,8 @@ class GemHandler(PackageHandler):
             contents = list(filter(lambda l: l.strip().startswith('gem'), contents))
 
         if self.packages_to_ignore:
-            packages_to_ignore = sorted(self.packages_to_ignore.split('|'))
-            print("Ignoring packages:", packages_to_ignore)
-            contents = list(filter(lambda l: l not in packages_to_ignore, contents))
+            print("Ignoring packages:", self.packages_to_ignore)
+            contents = list(filter(lambda l: l not in self.packages_to_ignore, contents))
 
         for line in contents:
             package = line.split()
@@ -145,7 +149,7 @@ class GemHandler(PackageHandler):
             line = " ".join(tokens)
             contents[i] = line
 
-        with open('/tmp/' + self.filename, 'w') as fh:
+        with open(self.get_destination(), 'w') as fh:
             fh.write(''.join(contents))
 
 
@@ -161,10 +165,9 @@ class CrateHandler(PackageHandler):
             contents = self.contents['dependencies']
 
         if self.packages_to_ignore:
-            packages_to_ignore = sorted(self.packages_to_ignore.split('|'))
-            print("Ignoring packages:", packages_to_ignore)
+            print("Ignoring packages:", self.packages_to_ignore)
 
-            for p in packages_to_ignore:
+            for p in self.packages_to_ignore:
                 contents.pop(p)
 
         for key, value in contents.items():
@@ -188,5 +191,5 @@ class CrateHandler(PackageHandler):
             elif type(original_val) == dict:
                 self.contents['dependencies'][p['name']]['version'] = p['latest']
 
-        with open('/tmp/' + self.filename, 'w') as fh:
+        with open(self.get_destination(), 'w') as fh:
             toml.dump(self.contents, fh)

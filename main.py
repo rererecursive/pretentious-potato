@@ -42,7 +42,7 @@ def main():
             print('  {:{}} {}'.format(package['name'], longest_name_length, package['latest']))
 
     handler.write_packages_to_file(packages)
-    print('\nWrote latest package versions to: /tmp/%s' % handler.filename)
+    print('\nWrote latest package versions to: %s' % handler.get_destination())
 
 
 def get_longest_name(packages):
@@ -73,20 +73,32 @@ def get_handler(user_args):
     file = sys.argv[1].split('=')[1]
     package_type = sys.argv[2].split('=')[1]
     to_ignore = sys.argv[3].split('=')[1]
+    overwrite = sys.argv[4].split('=')[1]
+
+    if to_ignore:
+        to_ignore = to_ignore.split('|')
+    else:
+        to_ignore = []
+
+    if overwrite.lower() == 'true':
+        overwrite = True
+    else:
+        overwrite = False
 
     types = ['pip', 'gem', 'crate', 'npm']
+    params = {'filename': file, 'packages_to_ignore': to_ignore, 'overwrite': overwrite}
 
     if package_type == 'pip':
-        return PipHandler(filename=file, packages_to_ignore=to_ignore, url='https://pypi.python.org/pypi/[PKG]/json')
+        return PipHandler(**params, url='https://pypi.python.org/pypi/[PKG]/json')
     if package_type == 'gem':
-        return GemHandler(filename=file, packages_to_ignore=to_ignore, url='https://rubygems.org/api/v1/gems/[PKG].json')
+        return GemHandler(**params, url='https://rubygems.org/api/v1/gems/[PKG].json')
     if package_type == 'crate':
-        return CrateHandler(filename=file, packages_to_ignore=to_ignore, url='https://crates.io/api/v1/crates/[PKG]')
+        return CrateHandler(**params, url='https://crates.io/api/v1/crates/[PKG]')
     if package_type == 'npm':
-        return NpmHandler(filename=file, packages_to_ignore=to_ignore, url='https://api.npms.io/v2/package/[PKG]')
+        return NpmHandler(**params, url='https://api.npms.io/v2/package/[PKG]')
 
     # TODO: proper error
-    print("ERROR: unsupported package type '%s'. Available types: %s" % (package_type, types))
+    print("ERROR: unsupported package type '%s'. Available types: %s" % (package_type, types), file=sys.stderr)
     exit(1)
 
 main()
