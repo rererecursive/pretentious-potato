@@ -15,14 +15,6 @@ import tqdm
     3b. Print the packages with newer versions in another block.
 """
 
-def pull_nodejs_versions(package_name):
-    url = "https://api.npms.io/v2/package/%s" % package_name
-    response = requests.get(url)
-    contents = json.loads(response.content)
-    version = contents['collected']['metadata']['version']
-
-    return version
-
 def get_longest_name(packages):
     # For formatting purposes
     names = [p['name'] for p in packages]
@@ -51,18 +43,21 @@ def get_handler(user_args):
     package_type = sys.argv[2].split('=')[1]
     to_ignore = sys.argv[3].split('=')[1]
 
+    types = ['pip', 'gem', 'crate', 'npm']
+
     if package_type == 'pip':
         return PipHandler(filename=file, packages_to_ignore=to_ignore, url='https://pypi.python.org/pypi/[PKG]/json')
     if package_type == 'gem':
         return GemHandler(filename=file, packages_to_ignore=to_ignore, url='https://rubygems.org/api/v1/gems/[PKG].json')
     if package_type == 'crate':
         return CrateHandler(filename=file, packages_to_ignore=to_ignore, url='https://crates.io/api/v1/crates/[PKG]')
+    if package_type == 'npm':
+        return NpmHandler(filename=file, packages_to_ignore=to_ignore, url='https://api.npms.io/v2/package/[PKG]')
 
-# TODO:
-#   - package reader
-#   - package puller
-#   - package installer
-#   - package writer
+    # TODO: proper error
+    print("ERROR: unsupported package type '%s'. Available types: %s" % (package_type, types))
+    exit(1)
+
 
 def main():
     handler = get_handler(sys.argv)
@@ -79,6 +74,7 @@ def main():
     longest_name_length = get_longest_name(packages)
     longest_current_version = get_longest_current_version(packages)
 
+    # TODO: add the time the new package was added (e.g. '2 months ago')
     if available_packages:
         print('\nAvailable:')
 
@@ -145,6 +141,39 @@ class PipHandler(PackageHandler):
         with open('/tmp/' + self.filename, 'w') as fh:
             for p in packages:
                 fh.write('%s==%s\n' % (p['name'], p['latest']))
+
+
+class NpmHandler(PackageHandler):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def read_packages_from_file(self):
+        with open(self.filename) as fh:
+            self.contents = json.load(fh)
+            contents = self.contents['dependencies']
+
+        # ...
+        if self.packages_to_ignore:
+            packages_to_ignore = sorted(self.packages_to_ignore.split('|'))
+            print("Ignoring packages:", packages_to_ignore)
+
+            for p in packages_to_ignore:
+                contents.pop(p)
+
+        return [{'name': k, 'current': v.replace('^', '')} for k,v in contents.items()]
+
+
+    def pull_latest_version(self, package_name):
+        info = self.pull_package_info(package_name)
+        return info['collected']['metadata']['version']
+
+    def write_packages_to_file(self, packages):
+        # Overwrite the version with the latest
+        for p in packages:
+            self.contents['dependencies'][p['name']] = p['latest']
+
+        with open('/tmp/' + self.filename, 'w') as fh:
+            json.dump(self.contents, fh, indent=2)
 
 
 class GemHandler(PackageHandler):
