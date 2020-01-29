@@ -9,7 +9,7 @@ tqdm==4.42.0
 toml==0.10.0
 ```
 
-Running `python3 main.py file=requirements.txt type=pip`:
+Running the Alpine Docker container: `docker run -v $PWD:/app rererecursive/latest-packages python3 main.py file=requirements.txt type=pip`:
 ```
 Fetching version information for 4 packages...
 100%|█████████████████████████████████████████████| 4/4 [00:01<00:00,  2.76it/s]
@@ -25,21 +25,39 @@ Latest [OK]:
 Wrote latest package versions to: /tmp/requirements.txt
 ```
 
-This currently supports:
-- crates (Rust)
-- gem (Ruby)
-- npm (NodeJS)
-- composer (PHP)
-- pip (Python)
+From inside a Jenkins pipeline:
+```groovy
+pipeline {
+    // ...
 
-It works by querying the APIs for each package manager. The URLs for these can be viewed in `main.py`
+    stage('Check for new packages') {
+        getLatestPackages(
+            file: 'requirements.txt'
+            type: 'pip',
+            ignore: ['awscli', 'numpy'],  // Ignore these packages from the search
+            overwrite: true     // Overwrite the packages file with the latest versions
+        )
+    }
+    // ...
+}
+```
+
+## Package support
+- NodeJS
+- PHP
+- Python
+- Ruby
+- Rust
+
+It works by querying the APIs for each language's package manager. The URLs can be viewed in `main.py`.
 
 ## Purpose
 This is intended to be added to an existing CI/CD process. There is generally a debate regarding locking versions to specific numbers vs using the 'latest' version.
 This allows us to do both.
-The idea is to lock versions to specific numbers, but get notified (or automatically update and build) if new versions appear.
-We then get the best of both worlds: things don't suddenly break, and packages get their latest features.
+The idea is to lock versions to specific numbers, but to get notified (or automatically update and build) if new versions appear.
+We then get the best of both worlds: builds are repeatable and won't suddenly break, and packages can also get their latest features and fixes.
 
 ## Options
+Additional options to the Python script:
 `overwrite=true | [false]` - overwrite the original file that contains the package versions
 `ignore=awscli,numpy` - ignore specific packages from being searched for new versions
