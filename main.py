@@ -3,7 +3,7 @@ import re
 import sys
 import tqdm
 
-from handlers import PipHandler, CrateHandler, NpmHandler, GemHandler
+from handlers import PipHandler, CrateHandler, NpmHandler, GemHandler, ComposerHandler
 
 """
 1. Read the packages file
@@ -22,8 +22,8 @@ def main():
         latest = handler.pull_latest_version(package['name'])
         package['latest'] = latest
 
-    available_packages = list(filter(lambda p: get_version(p['current']) < get_version(p['latest']), packages))
-    latest_packages = list(filter(lambda p: get_version(p['current']) >= get_version(p['latest']), packages))
+    available_packages = list(filter(lambda p: not handler.is_current_package_latest(p['current'], p['latest']), packages))
+    latest_packages = list(filter(lambda p: handler.is_current_package_latest(p['current'], p['latest']), packages))
 
     longest_name_length = get_longest_name(packages)
     longest_current_version = get_longest_current_version(packages)
@@ -39,7 +39,7 @@ def main():
         print('\nLatest [OK]:')
 
         for package in latest_packages:
-            print('  {:{}} {}'.format(package['name'], longest_name_length, package['latest']))
+            print('  {:{}} {}'.format(package['name'], longest_name_length, package['current']))
 
     handler.write_packages_to_file(packages)
     print('\nWrote latest package versions to: %s' % handler.get_destination())
@@ -66,7 +66,7 @@ def get_version(package):
         except ValueError:
             return x
 
-    return tuple(tryint(x) for x in re.split('([0-9]+)', package))
+    return tuple(tryint(x) for x in re.split('([0-9]+)', package) if x)
 
 
 def get_handler(user_args):
@@ -85,7 +85,7 @@ def get_handler(user_args):
     else:
         overwrite = False
 
-    types = ['pip', 'gem', 'crate', 'npm']
+    types = ['pip', 'gem', 'crate', 'npm', 'composer']
     params = {'filename': file, 'packages_to_ignore': to_ignore, 'overwrite': overwrite}
 
     if package_type == 'pip':
@@ -96,6 +96,8 @@ def get_handler(user_args):
         return CrateHandler(**params, url='https://crates.io/api/v1/crates/[PKG]')
     if package_type == 'npm':
         return NpmHandler(**params, url='https://api.npms.io/v2/package/[PKG]')
+    if package_type == 'composer':
+        return ComposerHandler(**params, url='https://packagist.org/packages/[PKG].json')
 
     # TODO: proper error
     print("ERROR: unsupported package type '%s'. Available types: %s" % (package_type, types), file=sys.stderr)

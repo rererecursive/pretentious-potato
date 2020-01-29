@@ -30,6 +30,26 @@ class PackageHandler:
         else:
             return '/tmp/' + self.filename
 
+    def get_latest_package_version(self, versions):
+        """ In order to compare the package versions, we need to split them out into tuples
+        to ease with the comparison between strings and integers.
+        """
+        latest = max(self.get_version(v) for v in versions)
+
+        return ''.join(str(x) for x in latest)
+
+    def get_version(self, package):
+        def tryint(x):
+            try:
+                return int(x)
+            except ValueError:
+                return x
+
+        return tuple(tryint(x) for x in re.split('([0-9]+)', package) if x)
+
+    def is_current_package_latest(self, current, latest):
+        later = self.get_latest_package_version([current, latest])
+        return current == later
 
 class PipHandler(PackageHandler):
     def __init__(self, *args, **kwargs):
@@ -71,14 +91,13 @@ class NpmHandler(PackageHandler):
             self.contents = json.load(fh)
             contents = self.contents['dependencies']
 
-        # ...
         if self.packages_to_ignore:
             print("Ignoring packages:", self.packages_to_ignore)
 
             for p in self.packages_to_ignore:
                 contents.pop(p)
 
-        return [{'name': k, 'current': v.replace('^', '')} for k,v in contents.items()]
+        return [{'name': k, 'current': re.sub('\^|~', '', v)} for k,v in contents.items()]
 
 
     def pull_latest_version(self, package_name):
@@ -193,3 +212,51 @@ class CrateHandler(PackageHandler):
 
         with open(self.get_destination(), 'w') as fh:
             toml.dump(self.contents, fh)
+
+
+class ComposerHandler(PackageHandler):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def read_packages_from_file(self):
+        with open(self.filename) as fh:
+            self.contents = json.load(fh)
+            contents = self.contents['require']
+
+            # Packages without a slash aren't searchable
+            contents = {k:v for k,v in contents.items() if '/' in k}
+
+        if self.packages_to_ignore:
+            print("Ignoring packages:", self.packages_to_ignore)
+
+            for p in self.packages_to_ignore:
+                contents.pop(p)
+
+        return [{'name': k, 'current': re.sub('\^|~|\*', '', v)} for k,v in contents.items()]
+
+
+    def pull_latest_version(self, package_name):
+        info = self.pull_package_info(package_name)
+        pulled_versions = sorted(info['package']['versions'].keys())
+        versions = []
+
+        for ver in pulled_versions:
+            if ver.startswith('v'):
+                ver = ver[1:]
+
+            if ver.replace('.', '').isdigit():
+                # Only consider versions that are entirely numeric since a lot
+                # of packages usually contain arbitrary strings in them (e.g. 'dev').
+                versions.append(ver)
+
+        latest = self.get_latest_package_version(versions)
+
+        return latest
+
+    def write_packages_to_file(self, packages):
+        # Overwrite the version with the latest
+        for p in packages:
+            self.contents['require'][p['name']] = p['latest']
+
+        with open(self.get_destination(), 'w') as fh:
+            json.dump(self.contents, fh, indent=2)

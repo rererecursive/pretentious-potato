@@ -10,7 +10,7 @@ getLatestPackages(
     type: 'pip',
     [ignore]: ['awscli', 'numpy'],
     [overwrite]: true | [false]     // Overwrite the dependency file with the latest versions,
-    [ignoreVersions]: ['minor', 'patch']   // TODO: ignore types of versions (in semver)
+    [ignoreVersions]: ['minor', 'patch']   // TODO: ignore types of versions (semver)
 )
 
 */
