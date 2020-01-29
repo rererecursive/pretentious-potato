@@ -76,13 +76,13 @@ def get_handler(user_args):
     overwrite = False
 
     if len(sys.argv) >= 4:
-        to_ignore = sys.argv[3].split('=')[1]
-        if to_ignore:
+        arg = sys.argv[3].split('=')[1]
+        if arg:
             to_ignore = to_ignore.split(',')
 
     if len(sys.argv) >= 5:
-        overwrite = sys.argv[4].split('=')[1]
-        if overwrite.lower() == 'true':
+        arg = sys.argv[4].split('=')[1]
+        if arg.lower() == 'true':
             overwrite = True
 
     types = ['pip', 'gem', 'crate', 'npm', 'composer']
