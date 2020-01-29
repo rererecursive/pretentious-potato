@@ -72,18 +72,18 @@ def get_version(package):
 def get_handler(user_args):
     file = sys.argv[1].split('=')[1]
     package_type = sys.argv[2].split('=')[1]
-    to_ignore = sys.argv[3].split('=')[1]
-    overwrite = sys.argv[4].split('=')[1]
+    to_ignore = []
+    overwrite = False
 
-    if to_ignore:
-        to_ignore = to_ignore.split('|')
-    else:
-        to_ignore = []
+    if len(sys.argv) >= 4:
+        to_ignore = sys.argv[3].split('=')[1]
+        if to_ignore:
+            to_ignore = to_ignore.split(',')
 
-    if overwrite.lower() == 'true':
-        overwrite = True
-    else:
-        overwrite = False
+    if len(sys.argv) >= 5:
+        overwrite = sys.argv[4].split('=')[1]
+        if overwrite.lower() == 'true':
+            overwrite = True
 
     types = ['pip', 'gem', 'crate', 'npm', 'composer']
     params = {'filename': file, 'packages_to_ignore': to_ignore, 'overwrite': overwrite}

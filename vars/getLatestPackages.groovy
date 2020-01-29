@@ -16,7 +16,7 @@ getLatestPackages(
 */
 
 def call(config) {
-    def ignore = config.get('ignore', []).join('|')
+    def ignore = config.get('ignore', []).join(',')
     def overwrite = config.get('overwrite', '')
 
     docker.image('rererecursive/latest-packages').inside('-v $PWD:/app') {
