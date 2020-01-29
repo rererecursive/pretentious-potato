@@ -5,3 +5,5 @@ Gemfile
 Gemfile.lock
 .bundle
 __pycache__
+install.sh
+composer.json
